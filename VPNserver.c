@@ -12,6 +12,19 @@
 #define UDP_TARGET_PORT 9000   // Porta do servidor UDP
 #define MANAGER_PORT 8700      // Porta do servidor de gestão
 
+
+//Função de cifra de cesar
+void cifra_cesar(char *msg, int chave) {
+    for (int i = 0; msg[i] != '\0'; i++) {
+        char c = msg[i];
+        if (c >= 'a' && c <= 'z') {
+            msg[i] = 'a' + (c - 'a' + chave + 26) % 26;
+        } else if (c >= 'A' && c <= 'Z') {
+            msg[i] = 'A' + (c - 'A' + chave + 26) % 26;
+        }
+    }
+}
+
 // Função para lidar com o cliente do servidor de gestão
 void *handle_manager(void *arg) {
     int client_fd = *(int*)arg;
@@ -59,13 +72,23 @@ void process_tcp_connection(int client_fd) {
     udpAddr.sin_port = htons(UDP_TARGET_PORT);
     udpAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    // Loop para ler mensagens do cliente TCP e reenviar para o servidor UDP
+    // Loop para ler mensagens do cliente TCP e desencripta de volta com a cifra de cesar 
     while (1) {
-        int len = read(client_fd, buffer, sizeof(buffer));
+        int len = read(client_fd, buffer, sizeof(buffer) - 1);
         if (len <= 0) break;
-        printf("[VPNserver] Mensagem recebida por TCP: %s\n", buffer);
-        sendto(udpSock, buffer, len, 0, (struct sockaddr*)&udpAddr, sizeof(udpAddr));
-        printf("[VPNserver] Mensagem reenviada por UDP para ProgUDP2\n");
+        buffer[len] = '\0';
+        printf("[VPNserver] Mensagem encriptada recebida por TCP com sucesso: %s\n", buffer);
+
+        // Encontra o ':' e desencripta só o a mensagem
+        char *payload = strrchr(buffer, ':');
+        if (payload && *(payload + 1) != '\0') {
+            payload++; // Aponta para o início do texto a desencriptar
+            cifra_cesar(payload, -3);
+        }
+
+        printf("[VPNserver] Mensagem desencriptada: %s\n", buffer);
+        sendto(udpSock, buffer, strlen(buffer), 0, (struct sockaddr*)&udpAddr, sizeof(udpAddr));
+        printf("[VPNserver] Mensagem enviada por UDP para ProgUDP2\n");
     }
 
     close(udpSock);
