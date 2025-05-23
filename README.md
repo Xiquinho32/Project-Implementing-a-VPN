@@ -34,28 +34,28 @@ sudo apt install libssl-dev
 
 TCP Server:
 ```bash
-    gcc -o TCPserver TCPserver.c
-    ./TCPserver
+gcc -o TCPserver TCPserver.c
+./TCPserver
 ```
 TCP Client:  
 ```bash 
-    gcc -o TCPclient TCPclient.c
-    ./TCPclient
+gcc -o TCPclient TCPclient.c
+./TCPclient
 ```
 UDP Program 2:
 ```bash
-    gcc -o ProgUDP2 ProgUDP2.c
-    ./ProgUDP2
+gcc -o ProgUDP2 ProgUDP2.c
+./ProgUDP2
 ```
 UDP Program 1 (with SSL support):
 ```bash
-    gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto
-    ./ProgUDP1
+gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto
+./ProgUDP1
 ```
 ---
 
 ## 📌 Notes
-ProgUDP1 uses OpenSSL for encryption; ensure OpenSSL development libraries are installed.
+ProgUDP1 uses OpenSSL for encryption, ensure OpenSSL development libraries are installed.
 
 Run each program in a separate terminal window or tab in the order listed above.
 
