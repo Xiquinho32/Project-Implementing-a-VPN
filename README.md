@@ -1,6 +1,9 @@
 <p align="center">
-  <img src="https://cyphersoftware.space/wp-content/uploads/2025/05/logoweb.png" alt="Logo" width="200"/>
+  <a href="https://cyphersoftware.space" target="_blank">
+    <img src="https://cyphersoftware.space/wp-content/uploads/2025/05/logoweb.png" alt="Logo" width="200"/>
+  </a>
 </p>
+
 
 # 🛡️ Simple VPN Project – UDP over TCP with Encryption
 
@@ -23,6 +26,7 @@ Before compiling, make sure you have the required libraries installed:
 
 ```bash
 sudo apt install libssl-dev
+```
 
 ---
 
