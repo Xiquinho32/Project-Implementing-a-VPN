@@ -30,27 +30,31 @@ sudo apt install libssl-dev
 
 ---
 
-✅ Compile and Run
+## ✅ Compile and Run
 
 TCP Server:
+```bash
     gcc -o TCPserver TCPserver.c
     ./TCPserver
-
-TCP Client:
+```
+TCP Client:  
+```bash 
     gcc -o TCPclient TCPclient.c
     ./TCPclient
-
+```
 UDP Program 2:
+```bash
     gcc -o ProgUDP2 ProgUDP2.c
     ./ProgUDP2
-
+```
 UDP Program 1 (with SSL support):
+```bash
     gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto
     ./ProgUDP1
-
+```
 ---
 
-📌 Notes
+## 📌 Notes
 ProgUDP1 uses OpenSSL for encryption; ensure OpenSSL development libraries are installed.
 
 Run each program in a separate terminal window or tab in the order listed above.
@@ -59,16 +63,10 @@ This setup simulates a basic VPN tunnel using TCP for secure transport and UDP f
 
 ---
 
-🛠️ Troubleshooting
+## 🛠️ Troubleshooting
 If you encounter issues related to missing SSL headers or libraries:
-    sudo apt update
-    sudo apt install libssl-dev
-
+```bash
+sudo apt update
+sudo apt install libssl-dev
+```
 ---
-
-
-
-
-
-
-
