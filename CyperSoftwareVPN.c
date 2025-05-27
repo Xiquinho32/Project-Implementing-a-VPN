@@ -1,4 +1,4 @@
-// VPNclient.c
+// CyperSoftwareVPN.c
 // Includes das bibliotecas
 #include <stdio.h>     // Input/Output padrão
 #include <stdlib.h>    // Funções gerais
@@ -27,7 +27,7 @@ void cifra_cesar(char *msg, int chave) {
 // Função para lidar com o cliente do servidor de gestão
 void *handle_manager(void *arg) {
     int client_fd = *(int*)arg;
-    char menu[] = "== Menu de Configuração VPNClient ==\n1. Ver estado\n2. Sair\n";
+    char menu[] = "== Menu de Configuração CyperSoftwareVPN ==\n1. Ver estado\n2. Sair\n";
     write(client_fd, menu, strlen(menu));
     close(client_fd);
     free(arg);
@@ -88,7 +88,7 @@ int main() {
     while (1) {
         int len = recvfrom(udpSock, buffer, sizeof(buffer) - 1, 0, NULL, NULL);
         buffer[len] = '\0';
-        printf("[VPNclient] Mensagem recebida de ProgUDP1 por UDP: %s\n", buffer);
+        printf("[CyperSoftwareVPN] Mensagem recebida de ProgUDP1 por UDP: %s\n", buffer);
 
         // Encontra ':' e encripta só a mensagem (payload)
         char *payload = strrchr(buffer, ':');
@@ -98,7 +98,7 @@ int main() {
         }
 
         send(tcpSock, buffer, strlen(buffer), 0);
-        printf("[VPNclient] Mensagem encriptada enviada por TCP ao VPNserver\n");
+        printf("[CyperSoftwareVPN] Mensagem encriptada enviada por TCP ao VPNserver\n");
     }
 
     close(udpSock);
