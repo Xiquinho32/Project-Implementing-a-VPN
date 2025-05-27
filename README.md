@@ -16,7 +16,7 @@ To ensure correct communication between components, follow this execution order:
 1. **TCPserver**
 2. **TCPclient**
 3. **ProgUDP2**
-4. **ProgUDP1**
+4. **CyperSoftwareVPN**
 
 ---
 
@@ -32,15 +32,15 @@ sudo apt install libssl-dev
 
 ## ✅ Compile and Run
 
-TCP Server:
+ServerVPN:
 ```bash
-gcc -o TCPserver TCPserver.c
-./TCPserver
+gcc -o VPNserver VPNserver.c
+./VPNserver
 ```
-TCP Client:  
+CyperSoftwareVPN:  
 ```bash 
-gcc -o TCPclient TCPclient.c
-./TCPclient
+gcc -o CyperSoftwareVPN CyperSoftwareVPN.c
+./CyperSoftwareVPN
 ```
 UDP Program 2:
 ```bash
@@ -55,7 +55,7 @@ gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto
 ---
 
 ## 📌 Notes
-ProgUDP1 uses OpenSSL for encryption, ensure OpenSSL development libraries are installed.
+CyperSoftwareVPN uses OpenSSL for encryption, ensure OpenSSL development libraries are installed.
 
 Run each program in a separate terminal window or tab in the order listed above.
 
