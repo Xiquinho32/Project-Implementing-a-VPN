@@ -95,7 +95,7 @@ int main() {
 
 void mostrarMenu() { // Função para mostrar o menu principal
     printf("╔══════════════════════════════╗\n");
-    printf("║      CyperSoftware VPN       ║\n");
+    printf("║     CypherSoftware VPN       ║\n");
     printf("╠══════════════════════════════╣\n");
     printf("║  1) Autenticar               ║\n");
     printf("║  2) Registar                 ║\n");
@@ -334,7 +334,7 @@ void menuEnviarMensagens(const char *utilizador, int sock, struct sockaddr_in se
             // Montar mensagem com nome, IP e porto
             snprintf(buffer, sizeof(buffer), "%s (%s:%d) enviou a mensagem: %s", utilizador, ipLocal, portoLocal, mensagem);
 
-            // Enviar para 127.0.0.1:8000 -> CyperSoftware VPN
+            // Enviar para 127.0.0.1:8000 -> CypherSoftware VPN
             sendto(sock, buffer, strlen(buffer), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
         } else if (op == 2) {
             break;

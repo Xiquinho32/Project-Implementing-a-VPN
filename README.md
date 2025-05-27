@@ -16,7 +16,7 @@ To ensure correct communication between components, follow this execution order:
 1. **TCPserver**
 2. **TCPclient**
 3. **ProgUDP2**
-4. **CyperSoftwareVPN**
+4. **CypherSoftwareVPN**
 
 ---
 
@@ -39,7 +39,7 @@ gcc -o VPNserver VPNserver.c
 ```
 CyperSoftwareVPN:  
 ```bash 
-gcc -o CyperSoftwareVPN CyperSoftwareVPN.c
+gcc -o CypherSoftwareVPN CypherSoftwareVPN.c
 ./CyperSoftwareVPN
 ```
 UDP Program 2:
@@ -55,7 +55,7 @@ gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto
 ---
 
 ## 📌 Notes
-CyperSoftwareVPN uses OpenSSL for encryption, ensure OpenSSL development libraries are installed.
+CypherSoftwareVPN uses OpenSSL for encryption, ensure OpenSSL development libraries are installed.
 
 Run each program in a separate terminal window or tab in the order listed above.
 
