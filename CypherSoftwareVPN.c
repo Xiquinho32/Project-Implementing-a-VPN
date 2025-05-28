@@ -88,6 +88,8 @@ int main() {
     while (1) {
         int len = recvfrom(udpSock, buffer, sizeof(buffer) - 1, 0, NULL, NULL);
         buffer[len] = '\0';
+        FILE *logFile;
+        char utilizador[50];
         printf("[CyperSoftwareVPN] Mensagem recebida de ProgUDP1 por UDP: %s\n", buffer);
 
         // Encontra ':' e encripta só a mensagem (payload)
@@ -95,6 +97,13 @@ int main() {
         if (payload && *(payload + 1) != '\0') {
             payload++; // Aponta para o início do texto a encriptar
             cifra_cesar(payload, 3);
+        }
+
+        logFile = fopen("historico.txt", "a");
+        if (logFile) {
+            time_t agora = time(NULL);
+            fprintf(logFile, "%s - Data: %s \n", buffer, ctime(&agora));
+            fclose(logFile);
         }
 
         send(tcpSock, buffer, strlen(buffer), 0);
