@@ -77,18 +77,40 @@ void process_tcp_connection(int client_fd) {
         int len = read(client_fd, buffer, sizeof(buffer) - 1);
         if (len <= 0) break;
         buffer[len] = '\0';
-        printf("[VPNserver] Mensagem encriptada recebida por TCP com sucesso: %s\n", buffer);
+        char *sep = strchr(buffer, '|');
+        if (sep) {
+            int modo = atoi(buffer); // Obtém o modo de encriptação
+            char *conteudo = sep + 1; // Resto da mensagem
 
-        // Encontra o ':' e desencripta só o a mensagem
-        char *payload = strrchr(buffer, ':');
-        if (payload && *(payload + 1) != '\0') {
-            payload++; // Aponta para o início do texto a desencriptar
-            cifra_cesar(payload, -3);
+            printf("\n--------------------------------------------------------\n");
+            printf("[VPNserver] Mensagem encriptada recebida por TCP com sucesso: %s\n", conteudo);
+
+            if (modo == 1) {
+                // Modo 1: Sem encriptação
+                printf("[VPNserver] Modo 1: Mensagem não encriptada\n");
+            } else if (modo == 2) {
+                // Modo 2: Cifra de César
+                printf("[VPNserver] Modo 2: Cifra de César\n");
+                // Encontra o ':' e desencripta só o a mensagem
+                char *payload = strrchr(conteudo, ':');
+                if (payload && *(payload + 1) != '\0') {
+                    payload++; // Aponta para o início do texto a desencriptar
+                    cifra_cesar(payload, -3);
+                }
+                printf("[VPNserver] Mensagem desencriptada: %s\n", payload);
+            } else if (modo == 3) {
+                // Modo 3: Enigma (placeholder)
+                printf("[VPNserver] Modo 3: Enigma (não implementado)\n");
+            } else if (modo == 4) {
+                // Modo 4: Substituição (placeholder)
+                printf("[VPNserver] Modo 4: Substituição (não implementado)\n");
+            } else {
+                printf("[VPNserver] Modo desconhecido\n");
+            }
+
+            sendto(udpSock, conteudo, strlen(conteudo), 0, (struct sockaddr*)&udpAddr, sizeof(udpAddr));
+            printf("[VPNserver] Mensagem enviada por UDP para ProgUDP2\n");
         }
-
-        printf("[VPNserver] Mensagem desencriptada: %s\n", buffer);
-        sendto(udpSock, buffer, strlen(buffer), 0, (struct sockaddr*)&udpAddr, sizeof(udpAddr));
-        printf("[VPNserver] Mensagem enviada por UDP para ProgUDP2\n");
     }
 
     close(udpSock);

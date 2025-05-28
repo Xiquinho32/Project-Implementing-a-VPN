@@ -85,29 +85,53 @@ int main() {
 
     // Loop para receber mensagens do socket UDP e em seguida encriptar com a cifra de cesar
     char buffer[512];
+    char mensagem[512];
     while (1) {
         int len = recvfrom(udpSock, buffer, sizeof(buffer) - 1, 0, NULL, NULL);
         buffer[len] = '\0';
         FILE *logFile;
-        char utilizador[50];
-        printf("[CyperSoftwareVPN] Mensagem recebida de ProgUDP1 por UDP: %s\n", buffer);
+        char *sep = strchr(buffer, '|');
+        if (sep) {
+            int modo = atoi(buffer); // Obtém o modo de encriptação
+            char *conteudo = sep + 1; // Resto da mensagem
 
-        // Encontra ':' e encripta só a mensagem (payload)
-        char *payload = strrchr(buffer, ':');
-        if (payload && *(payload + 1) != '\0') {
-            payload++; // Aponta para o início do texto a encriptar
-            cifra_cesar(payload, 3);
+            printf("\n--------------------------------------------------------\n");
+            printf("[CyperSoftwareVPN] Mensagem recebida de ProgUDP1 por UDP: %s\n", conteudo);
+
+            if (modo == 1) {
+                // Modo 1: Sem encriptação
+                printf("[CyperSoftwareVPN] Modo 1: Mensagem não encriptada\n");
+            } else if (modo == 2) {
+                // Modo 2: Cifra de César
+                printf("[CyperSoftwareVPN] Modo 2: Cifra de César\n");
+                // Encontra ':' e encripta só a mensagem (payload)
+                char *payload = strrchr(conteudo, ':');
+                if (payload && *(payload + 1) != '\0') {
+                    payload++; // Aponta para o início do texto a encriptar
+                    cifra_cesar(payload, 3);
+                }
+            } else if (modo == 3) {
+                // Modo 3: Enigma (placeholder)
+                printf("[CyperSoftwareVPN] Modo 3: Enigma (não implementado)\n");
+            } else if (modo == 4) {
+                // Modo 4: Substituição (placeholder)
+                printf("[CyperSoftwareVPN] Modo 4: Substituição (não implementado)\n");
+            } else {
+                printf("[CyperSoftwareVPN] Modo desconhecido\n");
+            }
+
+            logFile = fopen("historico.txt", "a");
+            if (logFile) {
+                time_t agora = time(NULL);
+                fprintf(logFile, "%s - Data: %s", conteudo, ctime(&agora));
+                fclose(logFile);
+            }
+
+            snprintf(mensagem, sizeof(mensagem), "%d|%s", modo, conteudo);
+            //printf("[CyperSoftwareVPN] Mensagem encriptada: %s\n", conteudo);
+            send(tcpSock, mensagem, strlen(mensagem), 0);
+            printf("[CyperSoftwareVPN] Mensagem encriptada enviada por TCP ao VPNserver\n");
         }
-
-        logFile = fopen("historico.txt", "a");
-        if (logFile) {
-            time_t agora = time(NULL);
-            fprintf(logFile, "%s - Data: %s \n", buffer, ctime(&agora));
-            fclose(logFile);
-        }
-
-        send(tcpSock, buffer, strlen(buffer), 0);
-        printf("[CyperSoftwareVPN] Mensagem encriptada enviada por TCP ao VPNserver\n");
     }
 
     close(udpSock);

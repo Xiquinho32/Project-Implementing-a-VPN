@@ -267,16 +267,17 @@ void autenticar(int sock, struct sockaddr_in serverAddr) {
 
 // Função para mostrar o menu com os métodos disponíveis de criptografia
 void menuCriptografia(const char *utilizador, int sock, struct sockaddr_in serverAddr) {
-    int opcao;
+    int opcao, modo = 0;
     do {
         system("clear");
         printf("╔══════════════════════════════╗\n");
         printf("║    MENU DE CRIPTOGRAFIA      ║\n");
         printf("╠══════════════════════════════╣\n");
-        printf("║ 1) Cifra de César            ║\n");
-        printf("║ 2) Enigma (em breve)         ║\n");
-        printf("║ 3) Substituicao (em breve)   ║\n");
-        printf("║ 4) Voltar ao menu principal  ║\n");
+        printf("║ 1) Sem Encriptação           ║\n");
+        printf("║ 2) Cifra de César            ║\n");
+        printf("║ 3) Enigma (em breve)         ║\n");
+        printf("║ 4) Substituicao (em breve)   ║\n");
+        printf("║ 5) Voltar ao menu principal  ║\n");
         printf("╚══════════════════════════════╝\n");
         printf("\nEscolha uma opção: ");
         scanf("%d", &opcao);
@@ -284,24 +285,33 @@ void menuCriptografia(const char *utilizador, int sock, struct sockaddr_in serve
 
         switch (opcao) {
             case 1:
-                menuEnviarMensagens(utilizador, sock, serverAddr);//("César");
+                modo = 1; // Sem encriptação
+                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
                 break;
             case 2:
-                menuEnviarMensagens(utilizador, sock, serverAddr);//("Enigma");
+                modo = 2; // Cifra de César
+                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
                 break;
             case 3:
-                menuEnviarMensagens(utilizador, sock, serverAddr);//("Substituicao");
+                modo = 3; // Enigma
+                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
+                break;
+            case 4:
+                modo = 4; // Substituição
+                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
+                break;
+            case 5:
                 break;
             default:
                 printf("\nOpção inválida. Tente novamente.\n");
                 sleep(2);
                 break;
         }
-    } while (opcao != 4);
+    } while (opcao != 5);
 }
 
 // Função para enviar mensagens através do socket UDP
-void menuEnviarMensagens(const char *utilizador, int sock, struct sockaddr_in serverAddr) {
+void menuEnviarMensagens(const char *utilizador, int sock, struct sockaddr_in serverAddr, int modo) {
     char buffer[512];
     do {
         system("clear");
@@ -335,7 +345,7 @@ void menuEnviarMensagens(const char *utilizador, int sock, struct sockaddr_in se
             int portoLocal = ntohs(localAddr.sin_port);
 
             // Montar mensagem com nome, IP e porto
-            snprintf(buffer, sizeof(buffer), "%s (%s:%d) enviou a mensagem: %s", utilizador, ipLocal, portoLocal, mensagem);
+            snprintf(buffer, sizeof(buffer), "%d|%s (%s:%d) enviou a mensagem: %s", modo, utilizador, ipLocal, portoLocal, mensagem);
 
             // Enviar para 127.0.0.1:8000 -> CypherSoftware VPN
             sendto(sock, buffer, strlen(buffer), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
@@ -356,7 +366,7 @@ void verUtilizadores() {
 
     system("clear");
     printf("╔══════════════════════════════╗\n");
-    printf("║      Utilizadores Registados ║\n");
+    printf("║    Utilizadores Registados   ║\n");
     printf("╠══════════════════════════════╣\n");
 
     // Verifica se o ficheiro existe e lê os utilizadores

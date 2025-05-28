@@ -36,6 +36,7 @@ int main() {
     while (1) {
         int len = recvfrom(sock, buffer, sizeof(buffer)-1, 0, (struct sockaddr*)&fromAddr, &addrLen);
         buffer[len] = '\0';
+        printf("\n--------------------------------------------------------\n");
         printf("Recebido do VPNServer: %s\n", buffer);
     }
 
