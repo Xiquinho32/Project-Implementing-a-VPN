@@ -1,4 +1,3 @@
-// ProgUDP1.c
 // Includes das bibliotecas
 #include <stdio.h>       // Input/Output padrão
 #include <stdlib.h>      // Funções gerais (exit, malloc)
@@ -9,12 +8,16 @@
 #include <openssl/sha.h> // Funções de hash (SHA256)
 #include <termios.h>     // Terminal (getch)
 
-// Definições de constantes
-#define SERVER_PORT 8000             // Porta do servidor
-#define SERVER_IP "127.0.0.1"        // IP do servidor
+#define SERVER_PORT 8000
+#define SERVER_IP "127.0.0.1"
+#define BUFFER_SIZE 1024
 #define MAX_LEN 50                   // Tamanho máximo para utilizador e password
 #define HASH_HEX_LEN 65              // Tamanho do hash SHA256 em hexadecimal
-#define FICHEIRO "utilizadores.txt"  // Ficheiro de utilizadores
+
+typedef struct {
+    char tipo[20];
+    char nome[MAX_LEN];
+} UtilizadorInfo;
 
 // Função para ler um caractere sem mostrar no ecrã (usado em passwords)
 char getch() {
@@ -29,17 +32,23 @@ char getch() {
     return ch;
 }
 
-// Declarações de funções
-void mostrarMenu();
+// Função para limpar o buffer do stdin (para evitar problemas com scanf)
+void limparBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+void menu_inicial(int sock, struct sockaddr_in serverAddr);
+void pedirMenu(int sockfd, struct sockaddr_in serverAddr, char request[]);
 void autenticar(int sock, struct sockaddr_in serverAddr);
-void registar();
-void verUtilizadores();
-void verVersao();
-void menuEnviarMensagens();
-void limparBuffer();
 void lerPassword(char *dest);
 void sha256_string(const char *str, char *outputBuffer);
-void menuCriptografia(const char *utilizador, int sock, struct sockaddr_in serverAddr);
+void menu_admin(int sock, struct sockaddr_in serverAddr, const char *utilizador);
+void menuCriptografia(int sock, struct sockaddr_in serverAddr, const char *utilizador, int tipo);
+void menuEnviarMensagens(int sock, struct sockaddr_in serverAddr, const char *utilizador, int modo);
+void registar(int sock, struct sockaddr_in serverAddr, const char *utilizador);
+void verUtilizadores(int sock, struct sockaddr_in serverAddr, const char *utilizador);
+void verVersao(int sock, struct sockaddr_in serverAddr, const char *utilizador);
 
 int main() {
     int sock;
@@ -57,139 +66,56 @@ int main() {
     serverAddr.sin_port = htons(SERVER_PORT);
     inet_aton(SERVER_IP, &serverAddr.sin_addr);
 
-    // Loop do menu principal
-    int escolha;
-    do {
-        system("clear");
-        mostrarMenu();
-        printf("\nEscolha uma opção: ");
-        scanf("%d", &escolha);
-        limparBuffer();
 
-        switch (escolha) {
-            case 1:
-                autenticar(sock, serverAddr);
-                break;
-            case 2:
-                registar();
-                break;
-            case 3:
-                verUtilizadores();
-                break;
-            case 4:
-                verVersao();
-                break;
-            case 5:
-                printf("\nVolte sempre!\n");
-                exit(0);
-            default:
-                printf("\nOpção inválida. Tente novamente.\n");
-                sleep(2);
-        }
-
-    } while (escolha != 5);
-
-    close(sock);
+    menu_inicial(sock, serverAddr);
     return 0;
 }
 
-void mostrarMenu() { // Função para mostrar o menu principal
-    printf("╔══════════════════════════════╗\n");
-    printf("║     CypherSoftware VPN       ║\n");
-    printf("╠══════════════════════════════╣\n");
-    printf("║  1) Autenticar               ║\n");
-    printf("║  2) Registar                 ║\n");
-    printf("║  3) Ver Utilizadores         ║\n");
-    printf("║  4) Versão Software          ║\n");
-    printf("║  5) Sair                     ║\n");
-    printf("╚══════════════════════════════╝\n");
-}
+void menu_inicial(int sock, struct sockaddr_in serverAddr) {
+    char opcao;
+    char username[100], user_type[10];
 
-// Função para calcular o hash SHA256 de uma string (para password)
-void sha256_string(const char *str, char *outputBuffer) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256((unsigned char *)str, strlen(str), hash);
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-        sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
-    outputBuffer[64] = 0;
-}
+    while (1) {
+        system("clear");
+        printf("╔══════════════════════════════╗\n");
+        printf("║     CypherSoftware VPN       ║\n");
+        printf("║            Login             ║\n");
+        printf("╠══════════════════════════════╣\n");
+        printf("║  1) Autenticar               ║\n");
+        printf("║  2) Sair                     ║\n");
+        printf("╚══════════════════════════════╝\n");
+        printf("Escolha uma opção: ");
+        scanf(" %c", &opcao);
+        //limparBuffer();
 
-// Função para limpar o buffer do stdin (para evitar problemas com scanf)
-void limparBuffer() {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF);
-}
-
-// Função para ler a password sem mostrar os caracteres no ecrã (através de getch())
-void lerPassword(char *dest) {
-    char ch;
-    int i = 0;
-    while ((ch = getch()) != '\n' && ch != '\r') {
-        if (i < MAX_LEN - 1) {
-            dest[i++] = ch;
-            printf("*");
-        }
-    }
-    dest[i] = '\0';
-    printf("\n");
-}
-
-// Função para registar um novo utilizador
-void registar() {
-    char utilizador[MAX_LEN], password[MAX_LEN], hash[HASH_HEX_LEN];
-    char u[MAX_LEN], p[HASH_HEX_LEN];
-    int existente = 0;
-
-    system("clear");
-    printf("╔══════════════════════════════╗\n");
-    printf("║         Registar             ║\n");
-    printf("╚══════════════════════════════╝\n");
-    printf("\nUsername:\n> ");
-    scanf("%s", utilizador);
-    limparBuffer();
-
-    // Verifica se o utilizador já existe (no ficheiro utilizadores.txt)
-    FILE *file = fopen(FICHEIRO, "r");
-    if (file != NULL) {
-        while (fscanf(file, "%s %s", u, p) != EOF) {
-            if (strcmp(utilizador, u) == 0) {
-                existente = 1;
+        switch (opcao) {
+            case '1':
+                autenticar(sock, serverAddr);
                 break;
-            }
+            case '2':
+                printf("\nVolte Sempre!\n");
+                exit(0);
+            default:
+                printf("Opção inválida.\n");
         }
-        fclose(file);
+        sleep(1); // Pausa para o utilizador ver a mensagem
     }
-
-    if (existente) {
-        printf("\n⚠ Utilizador já existe. Escolha outro nome.\n");
-        return;
-    }
-
-    // Lê a password inserida e calcula o hash SHA256
-    printf("\nNova password:\n> ");
-    lerPassword(password);
-    sha256_string(password, hash);
-
-    // Adiciona o novo utilizador ao ficheiro utilizadores.txt
-    file = fopen(FICHEIRO, "a");
-    if (file == NULL) {
-        printf("\n❌ Erro ao gravar ficheiro.\n");
-        return;
-    }
-
-    time_t agora = time(NULL);
-    fprintf(file, "Utilizador: %s - Password: %s - Data: %s", utilizador, hash, ctime(&agora));
-    fclose(file);
-
-    printf("\n✅ Utilizador registado com sucesso!\n");
-    printf("\nPressione Enter para continuar...");
-    getchar();
 }
 
-// Função para autenticar o utilizador
+void pedirMenu(int sockfd, struct sockaddr_in serverAddr, char request[]) {
+    sendto(sockfd, request, strlen(request), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+
+    char menu_buffer[BUFFER_SIZE];
+    socklen_t addrlen = sizeof(serverAddr);
+    int n = recvfrom(sockfd, menu_buffer, sizeof(menu_buffer) - 1, 0, (struct sockaddr*)&serverAddr, &addrlen);
+    menu_buffer[n] = '\0'; // Termina a string
+
+    printf("%s", menu_buffer);
+}
+
 void autenticar(int sock, struct sockaddr_in serverAddr) {
     char utilizador[MAX_LEN], password[MAX_LEN], hashInput[HASH_HEX_LEN];
-    char linha[256], u[MAX_LEN], hashArmazenado[HASH_HEX_LEN];
+    char linha[256], u[MAX_LEN], hashArmazenado[HASH_HEX_LEN], tipo_str[20];
     int tentativas = 0, autenticado = 0;
     FILE *file, *logFile;
 
@@ -202,7 +128,7 @@ void autenticar(int sock, struct sockaddr_in serverAddr) {
     limparBuffer();
 
     // Verifica se o utilizador existe no ficheiro
-    file = fopen(FICHEIRO, "r");
+    file = fopen("utilizadores.txt", "r");
     if (file == NULL) {
         printf("\n❌ Erro ao abrir o ficheiro de utilizadores.\n");
         return;
@@ -210,7 +136,7 @@ void autenticar(int sock, struct sockaddr_in serverAddr) {
 
     int encontrado = 0;
     while (fgets(linha, sizeof(linha), file)) {
-        if (sscanf(linha, "Utilizador: %s - Password: %s", u, hashArmazenado) == 2) {
+        if (sscanf(linha, "Tipo: %s - Utilizador: %s - Password: %s", tipo_str, u, hashArmazenado) == 3) {
             if (strcmp(utilizador, u) == 0) {
                 encontrado = 1;
                 break;
@@ -252,55 +178,110 @@ void autenticar(int sock, struct sockaddr_in serverAddr) {
         time_t agora = time(NULL);
         char *timestamp = ctime(&agora);
         timestamp[strcspn(timestamp, "\n")] = 0; // Remove \n
-        fprintf(logFile, "%s - login: %s - %s\n", utilizador, autenticado ? "OK" : "FALHA", timestamp);
+        fprintf(logFile, "%s - login: %s - %s\n", utilizador, autenticado ? "OK" : "FALHA (password incorreta)", timestamp);
         fclose(logFile);
     }
 
     if (autenticado) {
-        printf("\n✅ Autenticacao bem-sucedida!\n");
-        sleep(2);
-        menuCriptografia(utilizador, sock, serverAddr);
+        printf("\n✅ Autenticação bem-sucedida! %s autenticado como %s!\n", utilizador, tipo_str);
+        sleep(4);
+        // Redireciona para o menu correto com base no tipo de utilizador
+        if (strcmp(tipo_str, "Admin") == 0) {
+            menu_admin(sock, serverAddr, utilizador);
+        } else {
+            menuCriptografia(sock, serverAddr, utilizador, 1);
+        }
     } else {
         printf("\n🚫 Tentativas excedidas.\n");
+        sleep(2);
     }
 }
 
-// Função para mostrar o menu com os métodos disponíveis de criptografia
-void menuCriptografia(const char *utilizador, int sock, struct sockaddr_in serverAddr) {
-    int opcao, modo = 0;
-    do {
+// Função para ler a password sem mostrar os caracteres no ecrã (através de getch())
+void lerPassword(char *dest) {
+    char ch;
+    int i = 0;
+    while ((ch = getch()) != '\n' && ch != '\r') {
+        if (i < MAX_LEN - 1) {
+            dest[i++] = ch;
+            printf("*");
+        }
+    }
+    dest[i] = '\0';
+    printf("\n");
+}
+
+// Função para calcular o hash SHA256 de uma string (para password)
+void sha256_string(const char *str, char *outputBuffer) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char *)str, strlen(str), hash);
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+        sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+    outputBuffer[64] = 0;
+}
+
+void menu_admin(int sock, struct sockaddr_in serverAddr, const char *utilizador) {
+    char opcao;
+    while (1) {
         system("clear");
-        printf("╔══════════════════════════════╗\n");
-        printf("║    MENU DE CRIPTOGRAFIA      ║\n");
-        printf("╠══════════════════════════════╣\n");
-        printf("║ 1) Sem Encriptação           ║\n");
-        printf("║ 2) Cifra de César            ║\n");
-        printf("║ 3) Enigma (em breve)         ║\n");
-        printf("║ 4) Substituicao (em breve)   ║\n");
-        printf("║ 5) Voltar ao menu principal  ║\n");
-        printf("╚══════════════════════════════╝\n");
-        printf("\nEscolha uma opção: ");
-        scanf("%d", &opcao);
-        limparBuffer();
+        pedirMenu(sock, serverAddr, "MENU:admin");
+        scanf(" %c", &opcao);
+        //limparBuffer();
 
         switch (opcao) {
-            case 1:
+            case '1':
+                menuCriptografia(sock, serverAddr, utilizador, 2);
+                break;
+            case '2':
+                registar(sock, serverAddr, utilizador);
+                break;
+            case '3':
+                verUtilizadores(sock, serverAddr, utilizador);
+                break;
+            case '4':
+                verVersao(sock, serverAddr, utilizador);
+                break;
+            case '5':
+                menu_inicial(sock, serverAddr);
+                break;
+            default:
+                printf("Opção inválida.\n");
+        }
+    }
+}
+
+void menuCriptografia(int sock, struct sockaddr_in serverAddr, const char *utilizador, int tipo) {
+    char opcao;
+    int modo = 0;
+    do {
+        system("clear");
+        pedirMenu(sock, serverAddr, "MENU:criptografia");
+        scanf(" %c", &opcao);
+        //limparBuffer();
+
+        switch (opcao) {
+            case '1':
                 modo = 1; // Sem encriptação
-                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
+                menuEnviarMensagens(sock, serverAddr, utilizador, modo);
                 break;
-            case 2:
+            case '2':
                 modo = 2; // Cifra de César
-                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
+                menuEnviarMensagens(sock, serverAddr, utilizador, modo);
                 break;
-            case 3:
+            case '3':
                 modo = 3; // Enigma
-                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
+                menuEnviarMensagens(sock, serverAddr, utilizador, modo);
                 break;
-            case 4:
+            case '4':
                 modo = 4; // Substituição
-                menuEnviarMensagens(utilizador, sock, serverAddr, modo);
+                menuEnviarMensagens(sock, serverAddr, utilizador, modo);
                 break;
-            case 5:
+            case '5':
+                if (tipo == 1) {
+                    menu_inicial(sock, serverAddr);
+                } else {
+                    menu_admin(sock, serverAddr, utilizador);
+                }
                 break;
             default:
                 printf("\nOpção inválida. Tente novamente.\n");
@@ -310,8 +291,7 @@ void menuCriptografia(const char *utilizador, int sock, struct sockaddr_in serve
     } while (opcao != 5);
 }
 
-// Função para enviar mensagens através do socket UDP
-void menuEnviarMensagens(const char *utilizador, int sock, struct sockaddr_in serverAddr, int modo) {
+void menuEnviarMensagens(int sock, struct sockaddr_in serverAddr, const char *utilizador, int modo) {
     char buffer[512];
     do {
         system("clear");
@@ -358,11 +338,108 @@ void menuEnviarMensagens(const char *utilizador, int sock, struct sockaddr_in se
     } while (1);
 }
 
+// Função para registar um novo utilizador
+void registar(int sock, struct sockaddr_in serverAddr, const char *utilizador) {
+    char utilizador_criar[MAX_LEN], u[MAX_LEN], password[MAX_LEN], p[MAX_LEN], confirmar[MAX_LEN], hash[HASH_HEX_LEN];
+    char linha[512];
+    int existente = 0;
+    int tipo = 0;
+    char tipo_str[20];
+
+    system("clear");
+    printf("╔══════════════════════════════╗\n");
+    printf("║           Registar           ║\n");
+    printf("╚══════════════════════════════╝\n");
+    printf("\nUsername:\n> ");
+    scanf("%s", utilizador_criar);
+    limparBuffer();
+
+    // Verifica se o utilizador já existe (no ficheiro utilizadores.txt)
+    FILE *usersfile = fopen("utilizadores.txt", "r");
+    if (usersfile != NULL) {
+        while (fgets(linha, sizeof(linha), usersfile) != NULL) {
+        // Tenta encontrar a parte "Utilizador: <nome>"
+        char *ptr = strstr(linha, "Utilizador: ");
+        if (ptr != NULL) {
+            ptr += strlen("Utilizador: ");
+            char nome_existente[MAX_LEN];
+            sscanf(ptr, "%s", nome_existente);
+            if (strcmp(utilizador_criar, nome_existente) == 0) {
+                existente = 1;
+                break;
+            }
+        }
+    }
+    fclose(usersfile);
+    }
+
+    if (existente) {
+        printf("\n⚠ Nome de utilizador já existe. Escolha outro nome.\n");
+        return;
+    }
+
+    // Lê a password inserida e calcula o hash SHA256
+    printf("\nNova password:\n> ");
+    lerPassword(password);
+    printf("Confirme a password:\n> ");
+    lerPassword(confirmar);
+
+    if (strcmp(password, confirmar) != 0) {
+        printf("\n❌ As passwords não coincidem. Tente novamente.\n");
+        return;
+    }
+
+    // Escolher tipo de utilizador
+    do {
+        printf("\nTipo de utilizador:\n1 - Utilizador\n2 - Admin\n> ");
+        scanf("%d", &tipo);
+        limparBuffer();
+    } while (tipo != 1 && tipo != 2);
+
+    strcpy(tipo_str, (tipo == 1) ? "Utilizador" : "Admin");
+
+    sha256_string(password, hash);
+
+    // Adiciona o novo utilizador ao ficheiro utilizadores.txt
+    usersfile = fopen("utilizadores.txt", "a");
+    if (usersfile == NULL) {
+        printf("\n❌ Erro ao gravar ficheiro.\n");
+        return;
+    }
+
+    time_t agora = time(NULL);
+    fprintf(usersfile, "Tipo: %s - Utilizador: %s - Password: %s - Data: %s", tipo_str, utilizador_criar, hash, ctime(&agora));
+    fclose(usersfile);
+
+    printf("\n✅ %s '%s' registado com sucesso!\n", tipo_str, utilizador_criar);
+    printf("\nPressione Enter para continuar...");
+    getchar();
+    limparBuffer();
+    menu_admin(sock, serverAddr, utilizador);
+}
+
+// Função para comparar dois UtilizadorInfo para ordenar
+int compararUtilizadores(const void *a, const void *b) {
+    UtilizadorInfo *ua = (UtilizadorInfo *)a;
+    UtilizadorInfo *ub = (UtilizadorInfo *)b;
+
+    // Primeiro ordena por tipo: Admin antes de Utilizador
+    int tipo_cmp = strcmp(ua->tipo, ub->tipo);
+    if (tipo_cmp != 0) {
+        if (strcmp(ua->tipo, "Admin") == 0) return -1;
+        else return 1;
+    }
+
+    // Se o tipo for igual, ordena por nome
+    return strcmp(ua->nome, ub->nome);
+}
+
 // Função para ver os utilizadores registados
-void verUtilizadores() {
+void verUtilizadores(int sock, struct sockaddr_in serverAddr, const char *utilizador) {
+    UtilizadorInfo lista[100];
+    int total = 0;
     char linha[256];
-    char utilizador[MAX_LEN];
-    FILE *file = fopen(FICHEIRO, "r");
+    FILE *file = fopen("utilizadores.txt", "r");
 
     system("clear");
     printf("╔══════════════════════════════╗\n");
@@ -373,29 +450,53 @@ void verUtilizadores() {
     if (file == NULL) {
         printf("║ Nenhum utilizador encontrado ║\n");
     } else {
-        while (fgets(linha, sizeof(linha), file)) {
-            // Procurar o "Utilizador:" na linha e extrair o nome
-            if (sscanf(linha, "Utilizador: %s", utilizador) == 1) {
-                printf("║ %-28s ║\n", utilizador);
+        while (fgets(linha, sizeof(linha), file) != NULL) {
+            char tipo[20], nome[MAX_LEN];
+
+            // Exemplo: Tipo: Admin - Utilizador: Nome - Password: ...
+            if (sscanf(linha, "Tipo: %[^-]- Utilizador: %[^-]", tipo, nome) == 2) {
+                // Remove espaços no final de tipo e nome
+                tipo[strcspn(tipo, " ")] = 0;
+                nome[strcspn(nome, " ")] = 0;
+
+                strcpy(lista[total].tipo, tipo);
+                strcpy(lista[total].nome, nome);
+                total++;
             }
         }
         fclose(file);
+
+        // Ordenar a lista
+        qsort(lista, total, sizeof(UtilizadorInfo), compararUtilizadores);
+
+        // Mostrar a lista ordenada
+        for (int i = 0; i < total; i++) {
+            // Monta a string do meio para contar o comprimento real
+            char meio[100];
+            snprintf(meio, sizeof(meio), "%s - %s", lista[i].tipo, lista[i].nome);
+
+            // Calcula espaços à direita
+            int len = strlen(meio);
+            int espacos = 30 - len - 2; // -2 para as bordas "║ ║"
+            if (espacos < 0) espacos = 0;
+
+            printf("║ %s%*s ║\n", meio, espacos, "");
+        }
     }
 
     printf("╚══════════════════════════════╝\n");
     printf("\nPressione Enter para continuar...");
     getchar();
+    limparBuffer();
+    menu_admin(sock, serverAddr, utilizador);
 }
 
 // Função para mostrar a versão do software
-void verVersao() {
+void verVersao(int sock, struct sockaddr_in serverAddr, const char *utilizador) {
     system("clear");
-    printf("╔══════════════════════════════════╗\n");
-    printf("║          Versão Software         ║\n");
-    printf("╠══════════════════════════════════╣\n");
-    printf("║ Versão: 1.4                      ║\n");
-    printf("║ Desenvolvido por: Cyphersoftware ║\n");
-    printf("╚══════════════════════════════════╝\n");
+    pedirMenu(sock, serverAddr, "MENU:versao");
     printf("\nPressione Enter para continuar...");
     getchar();
+    limparBuffer();
+    menu_admin(sock, serverAddr, utilizador);
 }
