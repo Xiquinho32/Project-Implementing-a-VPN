@@ -40,7 +40,7 @@ gcc -o VPNserver VPNserver.c
 CyperSoftwareVPN:  
 ```bash 
 gcc -o CypherSoftwareVPN CypherSoftwareVPN.c
-./CyperSoftwareVPN
+./CypherSoftwareVPN
 ```
 UDP Program 2:
 ```bash
