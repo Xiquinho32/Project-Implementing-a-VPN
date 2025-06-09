@@ -61,6 +61,9 @@ Run each program in a separate terminal window or tab in the order listed above.
 
 This setup simulates a basic VPN tunnel using TCP for secure transport and UDP for application-level communication.
 
+The file 'utilizadores.txt' stores the data of all users (both regular users and administrators), and the default account is admin:admin.
+
+
 ---
 
 ## 🛠️ Troubleshooting

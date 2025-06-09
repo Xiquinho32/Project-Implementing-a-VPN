@@ -113,6 +113,7 @@ void pedirMenu(int sockfd, struct sockaddr_in serverAddr, char request[]) {
     printf("%s", menu_buffer);
 }
 
+
 void autenticar(int sock, struct sockaddr_in serverAddr) {
     char utilizador[MAX_LEN], password[MAX_LEN], hashInput[HASH_HEX_LEN];
     char linha[256], u[MAX_LEN], hashArmazenado[HASH_HEX_LEN], tipo_str[20];

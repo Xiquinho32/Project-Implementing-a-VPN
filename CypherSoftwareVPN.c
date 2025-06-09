@@ -1,18 +1,49 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <time.h>
+// CyperSoftwareVPN.c
+// Includes das bibliotecas
+#include <stdio.h>     // Input/Output padrão
+#include <stdlib.h>    // Funções gerais
+#include <string.h>    // Manipulação de strings
+#include <unistd.h>    // Funções de POSIX
+#include <arpa/inet.h> // Funções de rede para sockets
+#include <pthread.h>   // Funções de threads
+#include <time.h>      // Para srand e time()
 
-#define UDP_PORT 8000
-#define SERVER_TCP_IP "127.0.0.1"
-#define SERVER_TCP_PORT 8500 
-#define MANAGER_PORT 8600
+// Definições de constantes
+#define UDP_PORT 8000             // Porta do servidor
+#define SERVER_TCP_IP "127.0.0.1" // IP do servidor
+#define SERVER_TCP_PORT 8500      // Porta do servidor TCP
+#define MANAGER_PORT 8600         // Porta do servidor de gestão
 #define SIZE 1024
 
-void cifra_cesar(char *msg, int chave);
+// Parâmetros públicos Diffie-Hellman
+#define DH_P 11
+#define DH_G 5
+
+// Função para cálculo modular rápido (potência modular)
+unsigned long long mod_pow(unsigned long long base, unsigned long long exp, unsigned long long mod) {
+    unsigned long long result = 1;
+    base = base % mod;
+    while (exp > 0) {
+        if (exp % 2 == 1) { // se o expoente é ímpar
+            result = (result * base) % mod;
+        }
+        base = (base * base) % mod;
+        exp = exp / 2;
+    }
+    return result;
+}
+
+// Cifra de César
+void cifra_cesar(char *msg, int chave) {
+    for (int i = 0; msg[i] != '\0'; i++) {
+        char c = msg[i];
+        if (c >= 'a' && c <= 'z') {
+            msg[i] = 'a' + (c - 'a' + chave + 26) % 26;
+        } else if (c >= 'A' && c <= 'Z') {
+            msg[i] = 'A' + (c - 'A' + chave + 26) % 26;
+        }
+    }
+}
 
 // Função para lidar com o cliente do servidor de gestão
 void *handle_manager(void *arg) {
@@ -59,7 +90,7 @@ const char *menu_admin =
     "║  4) Versão Software          ║\n"
     "║  5) Sair                     ║\n"
     "╚══════════════════════════════╝\n"
-    "\nEscolha uma opção: ";
+    "\nEscolha uma opcao: ";
 
 const char *menu_criptografia = 
     "╔══════════════════════════════╗\n"
@@ -68,10 +99,10 @@ const char *menu_criptografia =
     "║ 1) Sem Encriptação           ║\n"
     "║ 2) Cifra de César            ║\n"
     "║ 3) Enigma (em breve)         ║\n"
-    "║ 4) Substituição (em breve)   ║\n"
+    "║ 4) Substituicao (em breve)   ║\n"
     "║ 5) Voltar ao menu principal  ║\n"
     "╚══════════════════════════════╝\n"
-    "\nEscolha uma opção: ";
+    "\nEscolha uma opcao: ";
 
 const char *menu_versao =
     "╔══════════════════════════════════╗\n"
@@ -109,7 +140,35 @@ int main() {
 
     printf("Servidor CypherSoftwareVPN à escuta no porto %d...\n", UDP_PORT);
 
-    char buffer[SIZE], mensagem[512];
+    // --- Início da parte Diffie-Hellman ---
+
+    // Inicializar RNG para chave privada
+    srand(time(NULL));
+    unsigned long long private_key = (rand() % 20) + 1; // [1,20]
+
+    // Calcular chave pública
+    unsigned long long public_key = mod_pow(DH_G, private_key, DH_P);
+
+    // Enviar chave pública ao servidor
+    char buffer[SIZE];
+    snprintf(buffer, sizeof(buffer), "%llu", public_key);
+    send(tcpSock, buffer, strlen(buffer), 0);
+
+    // Receber chave pública do servidor
+    int len = read(tcpSock, buffer, sizeof(buffer) - 1);
+    buffer[len] = '\0';
+    unsigned long long server_public_key = strtoull(buffer, NULL, 10);
+
+    // Calcular chave secreta partilhada
+    unsigned long long shared_key = mod_pow(server_public_key, private_key, DH_P);
+
+    // Derivar chave da cifra de César (0-25)
+    int cesar_key = shared_key % 26;
+
+    printf("[CyperSoftwareVPN] Chave secreta DH = %llu, chave César derivada = %d\n", shared_key, cesar_key);
+
+    // --- Fim Diffie-Hellman ---
+        char mensagem[512];
     while (1) {
         memset(buffer, 0, SIZE);
         recvfrom(udpSock, buffer, SIZE, 0, (struct sockaddr*)&udpAddr, &addr_len);
@@ -142,8 +201,8 @@ int main() {
                     // Encontra ':' e encripta só a mensagem (payload)
                     char *payload = strrchr(conteudo, ':');
                     if (payload && *(payload + 1) != '\0') {
-                        payload++; // Aponta para o início do texto a encriptar
-                        cifra_cesar(payload, 3);
+                        payload++; // início do texto a encriptar
+                        cifra_cesar(payload, cesar_key);
                     }
                 } else if (modo == 3) {
                     // Modo 3: Enigma (placeholder)
@@ -173,15 +232,4 @@ int main() {
     close(udpSock);
     close(tcpSock);
     return 0;
-}
-
-void cifra_cesar(char *msg, int chave) {
-    for (int i = 0; msg[i] != '\0'; i++) {
-        char c = msg[i];
-        if (c >= 'a' && c <= 'z') {
-            msg[i] = 'a' + (c - 'a' + chave + 26) % 26;
-        } else if (c >= 'A' && c <= 'Z') {
-            msg[i] = 'A' + (c - 'A' + chave + 26) % 26;
-        }
-    }
 }

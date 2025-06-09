@@ -6,14 +6,34 @@
 #include <unistd.h>     // Funções de POSIX
 #include <pthread.h>    // Funções de threads
 #include <arpa/inet.h>  // Funções de rede para sockets
+#include <time.h>       // Para srand e time()
 
 // Definições de constantes
 #define TCP_PORT 8500          // Porta do servidor TCP
 #define UDP_TARGET_PORT 9000   // Porta do servidor UDP
 #define MANAGER_PORT 8700      // Porta do servidor de gestão
 
+// Parâmetros públicos Diffie-Hellman
+#define DH_P 11
+#define DH_G 5
 
-//Função de cifra de cesar
+// Função para cálculo modular rápido (potência modular)
+// +para nao causar overflows
+//(base^exp) % mod
+unsigned long long mod_pow(unsigned long long base, unsigned long long exp, unsigned long long mod) {
+    unsigned long long result = 1;
+    base = base % mod;
+    while (exp > 0) {
+        if (exp % 2 == 1) {
+            result = (result * base) % mod;
+        }
+        base = (base * base) % mod;
+        exp = exp / 2;
+    }
+    return result;
+}
+
+// Função de cifra
 void cifra_cesar(char *msg, int chave) {
     for (int i = 0; msg[i] != '\0'; i++) {
         char c = msg[i];
@@ -41,7 +61,6 @@ void *manager_server() {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
 
-    // Criação do socket para o servidor de gestão
     fd = socket(AF_INET, SOCK_STREAM, 0);
     addr.sin_family = AF_INET;
     addr.sin_port = htons(MANAGER_PORT);
@@ -61,7 +80,7 @@ void *manager_server() {
     }
 }
 
-// Função para processar a conexão TCP
+// Função para processar a conexão TCP com Diffie-Hellman
 void process_tcp_connection(int client_fd) {
     char buffer[512];
     struct sockaddr_in udpAddr;
@@ -72,30 +91,57 @@ void process_tcp_connection(int client_fd) {
     udpAddr.sin_port = htons(UDP_TARGET_PORT);
     udpAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    // Loop para ler mensagens do cliente TCP e desencripta de volta com a cifra de cesar 
+    // --- Início Diffie-Hellman ---
+
+    srand(time(NULL));
+    unsigned long long private_key = (rand() % 20) + 1;  // Chave privada do servidor
+    unsigned long long public_key = mod_pow(DH_G, private_key, DH_P);
+
+    // Receber chave pública do cliente
+    int len = read(client_fd, buffer, sizeof(buffer) - 1);
+    if (len <= 0) {
+        close(client_fd);
+        close(udpSock);
+        return;
+    }
+    buffer[len] = '\0';
+    unsigned long long client_public_key = strtoull(buffer, NULL, 10);
+
+    // Enviar chave pública do servidor para o cliente
+    snprintf(buffer, sizeof(buffer), "%llu", public_key);
+    send(client_fd, buffer, strlen(buffer), 0);
+
+    // Calcular chave secreta partilhada
+    unsigned long long shared_key = mod_pow(client_public_key, private_key, DH_P);
+    int cesar_key = shared_key % 26;
+
+    printf("[VPNserver] Chave secreta DH = %llu, chave César derivada = %d\n", shared_key, cesar_key);
+
+    // --- Fim Diffie-Hellman ---
+
+    // Loop para ler mensagens do cliente TCP e desencriptar com a cifra de cesar
     while (1) {
         int len = read(client_fd, buffer, sizeof(buffer) - 1);
         if (len <= 0) break;
         buffer[len] = '\0';
         char *sep = strchr(buffer, '|');
         if (sep) {
-            int modo = atoi(buffer); // Obtém o modo de encriptação
-            char *conteudo = sep + 1; // Resto da mensagem
+            int modo = atoi(buffer);
+            char *conteudo = sep + 1;
 
             printf("\n--------------------------------------------------------\n");
             printf("[VPNserver] Mensagem encriptada recebida por TCP com sucesso: %s\n", conteudo);
 
             if (modo == 1) {
-                // Modo 1: Sem encriptação
                 printf("[VPNserver] Modo 1: Mensagem não encriptada\n");
             } else if (modo == 2) {
-                // Modo 2: Cifra de César
                 printf("[VPNserver] Modo 2: Cifra de César\n");
                 // Encontra o ':' e desencripta só o a mensagem
                 char *payload = strrchr(conteudo, ':');
                 if (payload && *(payload + 1) != '\0') {
-                    payload++; // Aponta para o início do texto a desencriptar
-                    cifra_cesar(payload, -3);
+                   payload++; // início da mensagem cifrada
+                    // Aqui usa-se a chave derivada DH para desencriptar (chave negativa)
+                    cifra_cesar(payload, -cesar_key);
                 }
                 printf("[VPNserver] Mensagem desencriptada: %s\n", payload);
             } else if (modo == 3) {
