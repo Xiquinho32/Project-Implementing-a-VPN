@@ -7,6 +7,7 @@
 #include <arpa/inet.h> // Funções de rede para sockets
 #include <pthread.h>   // Funções de threads
 #include <time.h>      // Para srand e time()
+#include <ctype.h>
 
 // Definições de constantes
 #define UDP_PORT 8000             // Porta do servidor
@@ -18,6 +19,10 @@
 // Parâmetros públicos Diffie-Hellman
 #define DH_P 11
 #define DH_G 5
+
+// Para cifra de substituição
+#define ALPHABET "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#define ALPHABET_SIZE 26
 
 // Função para cálculo modular rápido (potência modular) -> Diffie-Hellman
 unsigned long long mod_pow(unsigned long long base, unsigned long long exp, unsigned long long mod) {
@@ -41,6 +46,31 @@ void cifra_cesar(char *msg, int chave) {
             msg[i] = 'a' + (c - 'a' + chave + 26) % 26;
         } else if (c >= 'A' && c <= 'Z') {
             msg[i] = 'A' + (c - 'A' + chave + 26) % 26;
+        }
+    }
+}
+
+void gerar_sub_key(char *sub_key) {
+    strcpy(sub_key, ALPHABET);
+
+    // Fisher-Yates shuffle
+    for (int i = ALPHABET_SIZE - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        // Troca sub_key[i] e sub_key[j]
+        char temp = sub_key[i];
+        sub_key[i] = sub_key[j];
+        sub_key[j] = temp;
+    }
+    sub_key[ALPHABET_SIZE] = '\0'; // Garante terminação
+}
+
+void cifra_substituicao(char *texto, const char *sub_key) {
+    for (int i = 0; texto[i] != '\0'; i++) {
+        char c = texto[i];
+        if (c >= 'A' && c <= 'Z') {
+            texto[i] = sub_key[c - 'A'];
+        } else if (c >= 'a' && c <= 'z') {
+            texto[i] = tolower(sub_key[c - 'a']);
         }
     }
 }
@@ -173,6 +203,11 @@ int main() {
     // Derivar chave da cifra de César (0-25)
     int cesar_key = shared_key % 26;
 
+    //cifra de substituição
+    char sub_key[ALPHABET_SIZE + 1];
+    gerar_sub_key(sub_key);
+    printf("Chave de substituição aleatória: %s\n", sub_key);
+
     printf("[CyperSoftwareVPN] Chave secreta DH = %llu, chave César derivada = %d\n", shared_key, cesar_key);
 
     char mensagem_final[512];
@@ -214,6 +249,7 @@ int main() {
                 printf("[CyperSoftwareVPN] Mensagem recebida de ProgUDP1 por UDP: %s\n", conteudo);
                 printf("[CyperSoftwareVPN] Hash da mensagem desencriptada: %d\n", hash_valor);
 
+                char *payload = strrchr(conteudo, ':');
                 if (modo == 1) {
                     // Modo 1: Sem encriptação
                     printf("[CyperSoftwareVPN] Modo 1: Mensagem não encriptada\n");
@@ -221,7 +257,6 @@ int main() {
                     // Modo 2: Cifra de César
                     printf("[CyperSoftwareVPN] Modo 2: Cifra de César\n");
                     // Encontra ':' e encripta só a mensagem (payload)
-                    char *payload = strrchr(conteudo, ':');
                     if (payload && *(payload + 1) != '\0') {
                         payload++; // início do texto a encriptar
                         cifra_cesar(payload, cesar_key);
@@ -231,6 +266,7 @@ int main() {
                     printf("[CyperSoftwareVPN] Modo 3: Enigma (não implementado)\n");
                 } else if (modo == 4) {
                     // Modo 4: Substituição (placeholder)
+                    cifra_substituicao(payload, sub_key);
                     printf("[CyperSoftwareVPN] Modo 4: Substituição (não implementado)\n");
                 } else {
                     printf("[CyperSoftwareVPN] Modo desconhecido\n");
@@ -243,7 +279,11 @@ int main() {
                     fclose(logFile);
                 }
 
-                snprintf(mensagem_final, sizeof(mensagem_final), "%d|%d|%s", modo, hash_valor, conteudo);
+                if (modo == 4) {
+                    snprintf(mensagem_final, sizeof(mensagem_final), "%d|%d|%s|%s", modo, hash_valor, conteudo, sub_key);
+                } else {
+                    snprintf(mensagem_final, sizeof(mensagem_final), "%d|%d|%s", modo, hash_valor, conteudo);
+                }
                 //printf("[CyperSoftwareVPN] Mensagem encriptada: %s\n", conteudo);
                 send(tcpSock, mensagem_final, strlen(mensagem_final), 0);
                 printf("[CyperSoftwareVPN] Mensagem encriptada enviada por TCP ao VPNserver\n");

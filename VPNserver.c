@@ -7,6 +7,7 @@
 #include <pthread.h>    // Funções de threads
 #include <arpa/inet.h>  // Funções de rede para sockets
 #include <time.h>       // Para srand e time()
+#include <ctype.h>
 
 // Definições de constantes
 #define TCP_PORT 8500          // Porta do servidor TCP
@@ -16,6 +17,9 @@
 // Parâmetros públicos Diffie-Hellman
 #define DH_P 11
 #define DH_G 5
+
+#define ALPHABET "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#define ALPHABET_SIZE 26
 
 // Função para cálculo modular rápido (potência modular)
 // +para nao causar overflows
@@ -44,6 +48,31 @@ void cifra_cesar(char *msg, int chave) {
         }
     }
 }
+
+void decifra_substituicao(char *texto, const char *sub_key) {
+    for (int i = 0; texto[i] != '\0'; i++) {
+        char c = texto[i];
+        if (c >= 'A' && c <= 'Z') {
+            // Procura c na sub_key
+            for (int j = 0; j < ALPHABET_SIZE; j++) {
+                if (sub_key[j] == c) {
+                    texto[i] = ALPHABET[j];
+                    break;
+                }
+            }
+        } else if (c >= 'a' && c <= 'z') {
+            // Procura versão minúscula na sub_key
+            for (int j = 0; j < ALPHABET_SIZE; j++) {
+                if (tolower(sub_key[j]) == c) {
+                    texto[i] = tolower(ALPHABET[j]);
+                    break;
+                }
+            }
+        }
+        // Outros caracteres permanecem iguais
+    }
+}
+
 
 // Função para calcular o hash de uma mensagem
 int hash(const char *message) {
@@ -91,6 +120,7 @@ void *manager_server() {
 
 // Função para processar a conexão TCP com Diffie-Hellman
 void process_tcp_connection(int client_fd) {
+    printf("Cheguei 1!\n");
     char buffer[512];
     struct sockaddr_in udpAddr;
     int udpSock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -106,12 +136,14 @@ void process_tcp_connection(int client_fd) {
     unsigned long long public_key = mod_pow(DH_G, private_key, DH_P); // Chave pública do servidor
 
     // Receber chave pública do cliente
+    printf("Cheguei 2!\n");
     int len = read(client_fd, buffer, sizeof(buffer) - 1);
-    if (len <= 0) {
+    printf("Cheguei 3!\n");
+    /* if (len <= 0) {
         close(client_fd);
         close(udpSock);
         return;
-    }
+    } */
     buffer[len] = '\0';
     unsigned long long client_public_key = strtoull(buffer, NULL, 10);
 
@@ -124,8 +156,6 @@ void process_tcp_connection(int client_fd) {
     int cesar_key = shared_key % 26;
 
     printf("[VPNserver] Chave secreta DH = %llu, chave César derivada = %d\n", shared_key, cesar_key);
-
-    // --- Fim Diffie-Hellman ---
 
     // Loop para ler mensagens do cliente TCP e desencriptar com a cifra de cesar
     while (1) {
@@ -144,8 +174,17 @@ void process_tcp_connection(int client_fd) {
         int hash_valor_client = atoi(token);
 
         // Extrair o resto do conteudo
-        char *conteudo = strtok(NULL, "");
-        if (!conteudo) continue; // 
+        char *conteudo = strtok(NULL, "|");
+        if (!conteudo) continue;
+
+        char *sub_key = NULL;
+        if (modo == 4) {
+            sub_key = strtok(NULL, "|");
+            if (!sub_key) {
+                printf("SUB_KEY não encontrada!\n");
+                continue;
+            }
+        }
 
         char *mensagem = strrchr(conteudo, ':');
         if (mensagem && *(mensagem + 1) != '\0') {
@@ -168,8 +207,9 @@ void process_tcp_connection(int client_fd) {
             // Modo 3: Enigma (placeholder)
             printf("[VPNserver] Modo 3: Enigma (não implementado)\n");
         } else if (modo == 4) {
-            // Modo 4: Substituição (placeholder)
             printf("[VPNserver] Modo 4: Substituição (não implementado)\n");
+            decifra_substituicao(mensagem, sub_key);
+            printf("[VPNserver] Mensagem desencriptada: %s\n", mensagem);
         } else {
             printf("[VPNserver] Modo desconhecido\n");
         }
@@ -195,10 +235,14 @@ int main() {
     pthread_t mthread;
     pthread_create(&mthread, NULL, manager_server, NULL);
 
+    printf("main 1\n");
+
     // Criação do socket TCP
     int tcpSock = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in addr, clientAddr;
     socklen_t len = sizeof(clientAddr);
+
+    printf("main 2\n");
 
     // Configuração do endereço do servidor TCP
     addr.sin_family = AF_INET;
@@ -207,11 +251,19 @@ int main() {
     bind(tcpSock, (struct sockaddr*)&addr, sizeof(addr));
     listen(tcpSock, 5);
 
+    printf("main 3\n");
+
     // Loop para aceitar conexões de clientes TCP
     while (1) {
         int client_fd = accept(tcpSock, (struct sockaddr*)&clientAddr, &len);
-        if (fork() == 0) {
+       pid_t pid = fork();
+        if (pid == 0) {
+            // Processo filho para lidar com a conexão TCP
+            printf("main 4\n");
             process_tcp_connection(client_fd);
+            exit(0);
+        } else if (pid < 0) {
+            perror("fork failed");
         }
         close(client_fd);
     }
