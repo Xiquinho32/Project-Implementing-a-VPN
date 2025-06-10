@@ -60,12 +60,11 @@ Create a script
 ```bash
 sudo nano compilar.sh
 ```
-Add the following code:
-```bash
-#!/bin/bash
-```
+
 ## Script to compile programs in order
 ```bash
+#!/bin/bash
+
 echo "A Compilar VPNserver.c..."
 gcc -o VPNserver VPNserver.c || { echo "Erro ao compilar VPNserver.c"; exit 1; }
 
