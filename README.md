@@ -91,14 +91,14 @@ Create the alias:
 ```bash
 nano ~/.bashrc
 ```
-Update the configurations:
-```bash
-source ~/.bashrc
-```
 Add the following line to the end of the script:
 Note: change the path of the file
 ```bash
 alias compilarvpn='~/meus_scripts/compilar.sh'
+```
+Update the configurations:
+```bash
+source ~/.bashrc
 ```
 Then you just need to type the alias:
 ```bash
