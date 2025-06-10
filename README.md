@@ -64,7 +64,7 @@ Add the following code:
 ```bash
 #!/bin/bash
 ```
-# Script para compilar os programas em ordem
+## Script to compile programs in order
 ```bash
 echo "A Compilar VPNserver.c..."
 gcc -o VPNserver VPNserver.c || { echo "Erro ao compilar VPNserver.c"; exit 1; }
