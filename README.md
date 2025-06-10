@@ -57,15 +57,15 @@ gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto
 ## Automate compilation
 
 Create a script 
-bash
+```bash
 sudo nano compilar.sh
-
+```
 Add the following code:
-bash
+```bash
 #!/bin/bash
-
+```
 # Script para compilar os programas em ordem
-
+```bash
 echo "A Compilar VPNserver.c..."
 gcc -o VPNserver VPNserver.c || { echo "Erro ao compilar VPNserver.c"; exit 1; }
 
@@ -79,32 +79,32 @@ echo "A Compilar ProgUDP1.c com bibliotecas SSL..."
 gcc -o ProgUDP1 ProgUDP1.c -lssl -lcrypto || { echo "Erro ao compilar ProgUDP1.c"; exit 1; }
 
 echo "Compilação concluída com sucesso!"
-
+```
 Give execute permission tothe file:
-bash
+```bash
 chmod +x compilar.sh
-
+```
 Execute the script:
-bash
+```bash
 ./compilar.sh
-
+```
 Create the alias:
-bash
+```bash
 nano ~/.bashrc
-
+```
 Update the configurations:
-bash
+```bash
 source ~/.bashrc
-
+```
 Add the following line to the end of the script:
 Note: change the path of the file
-bash
+```bash
 alias compilarvpn='~/meus_scripts/compilar.sh'
-
+```
 Then you just need to type the alias:
-bash
+```bash
 compilarvpn
-
+```
 ## 📌 Notes
 CypherSoftwareVPN uses OpenSSL for encryption, ensure OpenSSL development libraries are installed.
 
