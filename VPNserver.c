@@ -45,6 +45,15 @@ void cifra_cesar(char *msg, int chave) {
     }
 }
 
+// Função para calcular o hash de uma mensagem
+int hash(const char *message) {
+    int sum = 0;
+    for (int i = 0; message[i] != '\0'; i++) {
+        sum += (unsigned char)message[i];
+    }
+    return sum;
+}
+
 // Função para lidar com o cliente do servidor de gestão
 void *handle_manager(void *arg) {
     int client_fd = *(int*)arg;
@@ -91,11 +100,10 @@ void process_tcp_connection(int client_fd) {
     udpAddr.sin_port = htons(UDP_TARGET_PORT);
     udpAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    // --- Início Diffie-Hellman ---
-
+    // Diffie-Hellman: Inicializar RNG e gerar chave privada
     srand(time(NULL));
     unsigned long long private_key = (rand() % 20) + 1;  // Chave privada do servidor
-    unsigned long long public_key = mod_pow(DH_G, private_key, DH_P);
+    unsigned long long public_key = mod_pow(DH_G, private_key, DH_P); // Chave pública do servidor
 
     // Receber chave pública do cliente
     int len = read(client_fd, buffer, sizeof(buffer) - 1);
@@ -124,38 +132,57 @@ void process_tcp_connection(int client_fd) {
         int len = read(client_fd, buffer, sizeof(buffer) - 1);
         if (len <= 0) break;
         buffer[len] = '\0';
-        char *sep = strchr(buffer, '|');
-        if (sep) {
-            int modo = atoi(buffer);
-            char *conteudo = sep + 1;
 
-            printf("\n--------------------------------------------------------\n");
-            printf("[VPNserver] Mensagem encriptada recebida por TCP com sucesso: %s\n", conteudo);
+        // Extrair o modo
+        char *token = strtok(buffer, "|");
+        if (!token) continue;
+        int modo = atoi(token);
 
-            if (modo == 1) {
-                printf("[VPNserver] Modo 1: Mensagem não encriptada\n");
-            } else if (modo == 2) {
-                printf("[VPNserver] Modo 2: Cifra de César\n");
-                // Encontra o ':' e desencripta só o a mensagem
-                char *payload = strrchr(conteudo, ':');
-                if (payload && *(payload + 1) != '\0') {
-                   payload++; // início da mensagem cifrada
-                    // Aqui usa-se a chave derivada DH para desencriptar (chave negativa)
-                    cifra_cesar(payload, -cesar_key);
-                }
-                printf("[VPNserver] Mensagem desencriptada: %s\n", payload);
-            } else if (modo == 3) {
-                // Modo 3: Enigma (placeholder)
-                printf("[VPNserver] Modo 3: Enigma (não implementado)\n");
-            } else if (modo == 4) {
-                // Modo 4: Substituição (placeholder)
-                printf("[VPNserver] Modo 4: Substituição (não implementado)\n");
-            } else {
-                printf("[VPNserver] Modo desconhecido\n");
-            }
+        // Extrair hash_valor_client
+        token = strtok(NULL, "|");
+        if (!token) continue;
+        int hash_valor_client = atoi(token);
 
+        // Extrair o resto do conteudo
+        char *conteudo = strtok(NULL, "");
+        if (!conteudo) continue; // 
+
+        char *mensagem = strrchr(conteudo, ':');
+        if (mensagem && *(mensagem + 1) != '\0') {
+            mensagem++; // Ponto de início da mensagem cifrada
+            while (*mensagem == ' ') mensagem++; // Remove espaços iniciais
+        } else {
+            mensagem = ""; // Se não houver mensagem, define como string vazia
+        }
+
+        printf("\n--------------------------------------------------------\n");
+        printf("[VPNserver] Mensagem encriptada recebida por TCP com sucesso: %s\n", conteudo);
+
+        if (modo == 1) {
+            printf("[VPNserver] Modo 1: Mensagem não encriptada\n");
+        } else if (modo == 2) {
+            printf("[VPNserver] Modo 2: Cifra de César\n");
+            cifra_cesar(mensagem, -cesar_key);
+            printf("[VPNserver] Mensagem desencriptada: %s\n", mensagem);
+        } else if (modo == 3) {
+            // Modo 3: Enigma (placeholder)
+            printf("[VPNserver] Modo 3: Enigma (não implementado)\n");
+        } else if (modo == 4) {
+            // Modo 4: Substituição (placeholder)
+            printf("[VPNserver] Modo 4: Substituição (não implementado)\n");
+        } else {
+            printf("[VPNserver] Modo desconhecido\n");
+        }
+
+        // Calcular o hash da mensagem desencriptada
+        int hash_valor = hash(mensagem);
+        if (hash_valor != hash_valor_client) {
+            printf("[VPNserver] Hash da mensagem desencriptada: %d (diferente do recebido: %d)\n", hash_valor, hash_valor_client);
+            printf("[VPNserver] Mensagem não enviada por UDP para ProgUDP2 por falta de integridade dos dados!\n");
+        } else {
+            printf("[VPNserver] Hash da mensagem desencriptada: %d (igual ao recebido: %d)\n", hash_valor, hash_valor_client);
             sendto(udpSock, conteudo, strlen(conteudo), 0, (struct sockaddr*)&udpAddr, sizeof(udpAddr));
-            printf("[VPNserver] Mensagem enviada por UDP para ProgUDP2\n");
+            printf("[VPNserver] Mensagem enviada por UDP para ProgUDP2!\n");
         }
     }
 

@@ -19,7 +19,7 @@
 #define DH_P 11
 #define DH_G 5
 
-// Função para cálculo modular rápido (potência modular)
+// Função para cálculo modular rápido (potência modular) -> Diffie-Hellman
 unsigned long long mod_pow(unsigned long long base, unsigned long long exp, unsigned long long mod) {
     unsigned long long result = 1;
     base = base % mod;
@@ -43,6 +43,15 @@ void cifra_cesar(char *msg, int chave) {
             msg[i] = 'A' + (c - 'A' + chave + 26) % 26;
         }
     }
+}
+
+// Função para calcular o hash de uma mensagem
+int hash(const char *message) {
+    int sum = 0;
+    for (int i = 0; message[i] != '\0'; i++) {
+        sum += (unsigned char)message[i];
+    }
+    return sum;
 }
 
 // Função para lidar com o cliente do servidor de gestão
@@ -140,8 +149,7 @@ int main() {
 
     printf("Servidor CypherSoftwareVPN à escuta no porto %d...\n", UDP_PORT);
 
-    // --- Início da parte Diffie-Hellman ---
-
+    // Diffie-Hellman
     // Inicializar RNG para chave privada
     srand(time(NULL));
     unsigned long long private_key = (rand() % 20) + 1; // [1,20]
@@ -167,8 +175,9 @@ int main() {
 
     printf("[CyperSoftwareVPN] Chave secreta DH = %llu, chave César derivada = %d\n", shared_key, cesar_key);
 
-    // --- Fim Diffie-Hellman ---
-        char mensagem[512];
+    char mensagem_final[512];
+    char mensagem_copia[512];
+    int hash_valor;
     while (1) {
         memset(buffer, 0, SIZE);
         recvfrom(udpSock, buffer, SIZE, 0, (struct sockaddr*)&udpAddr, &addr_len);
@@ -181,7 +190,6 @@ int main() {
         } else if (strncmp(buffer, "MENU:versao", 10) == 0) {
             sendto(udpSock, menu_versao, strlen(menu_versao), 0, (struct sockaddr*)&udpAddr, addr_len);
         } else {
-            //buffer[len] = '\0';
 
             FILE *logFile;
             char *sep = strchr(buffer, '|');
@@ -189,8 +197,22 @@ int main() {
                 int modo = atoi(buffer); // Obtém o modo de encriptação
                 char *conteudo = sep + 1; // Resto da mensagem
 
+                char *sep2 = strrchr(buffer, ':');
+
+                if (sep2 != NULL && *(sep2 + 1) != '\0') {
+                    char *message = sep2 + 1; // Pega a mensagem após o último ':'
+                    while (*message == ' ') message++; // Remove espaços iniciais
+
+                    // Guarda a mensagem numa variável
+                    strncpy(mensagem_copia, message, sizeof(mensagem_copia) - 1);
+                    mensagem_copia[sizeof(mensagem_copia) - 1] = '\0'; // Garante que a string está terminada
+                } 
+
+                int hash_valor = hash(mensagem_copia);
+
                 printf("\n--------------------------------------------------------\n");
                 printf("[CyperSoftwareVPN] Mensagem recebida de ProgUDP1 por UDP: %s\n", conteudo);
+                printf("[CyperSoftwareVPN] Hash da mensagem desencriptada: %d\n", hash_valor);
 
                 if (modo == 1) {
                     // Modo 1: Sem encriptação
@@ -221,9 +243,9 @@ int main() {
                     fclose(logFile);
                 }
 
-                snprintf(mensagem, sizeof(mensagem), "%d|%s", modo, conteudo);
+                snprintf(mensagem_final, sizeof(mensagem_final), "%d|%d|%s", modo, hash_valor, conteudo);
                 //printf("[CyperSoftwareVPN] Mensagem encriptada: %s\n", conteudo);
-                send(tcpSock, mensagem, strlen(mensagem), 0);
+                send(tcpSock, mensagem_final, strlen(mensagem_final), 0);
                 printf("[CyperSoftwareVPN] Mensagem encriptada enviada por TCP ao VPNserver\n");
             }
         }
