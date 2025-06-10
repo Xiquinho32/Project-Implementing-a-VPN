@@ -188,14 +188,14 @@ const char *menu_admin =
     "║  1) Enviar Mensagem          ║\n"
     "║  2) Registar                 ║\n"
     "║  3) Ver Utilizadores         ║\n"
-    "║  4) Versão Software          ║\n"
+    "║  4) Informações              ║\n"
     "║  5) Sair                     ║\n"
     "╚══════════════════════════════╝\n"
     "\nEscolha uma opção: ";
 
 const char *menu_criptografia = 
     "╔══════════════════════════════╗\n"
-    "║    MENU DE CRIPTOGRAFIA      ║\n"
+    "║     MENU DE CRIPTOGRAFIA     ║\n"
     "╠══════════════════════════════╣\n"
     "║ 1) Sem Encriptação           ║\n"
     "║ 2) Cifra de César            ║\n"
@@ -206,12 +206,16 @@ const char *menu_criptografia =
     "\nEscolha uma opção: ";
 
 const char *menu_versao =
-    "╔══════════════════════════════════╗\n"
-    "║          Versão Software         ║\n"
-    "╠══════════════════════════════════╣\n"
-    "║ Versão: 2.3                      ║\n"
-    "║ Desenvolvido por: Cyphersoftware ║\n"
-    "╚══════════════════════════════════╝\n";
+    "╔════════════════════════════════════╗\n"
+    "║            INFORMAÇÕES             ║\n"
+    "╠════════════════════════════════════╣\n"
+    "║ Versão: 2.3                        ║\n"
+    "╠════════════════════════════════════╣\n"
+    "║ IP: 127.0.0.1                      ║\n"
+    "║ Porta TCP: 8500                    ║\n"
+    "╠════════════════════════════════════╣\n"
+    "║ © Copyright by Cyphersoftware 2025 ║\n"
+    "╚════════════════════════════════════╝\n";
 
 int main() {
     pthread_t mthread;
