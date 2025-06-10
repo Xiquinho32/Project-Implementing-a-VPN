@@ -18,8 +18,21 @@
 #define DH_P 11
 #define DH_G 5
 
+// Para cifra de substituição
 #define ALPHABET "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 #define ALPHABET_SIZE 26
+
+// Enigma
+const char* ROTOR_I = "EKMFLGDQVZNTOWYHXUSPAIBRCJ";
+const char* ROTOR_II = "AJDKSIRUXBLHWTMCQGZNPYFVOE";
+const char* ROTOR_III = "BDFHJLCPRTXVZNYEIWGAKMUSQO";
+const char* REFLECTOR_B = "YRUHQSLDPXNGOKMIEBFZCWVJAT";
+
+typedef struct {
+    const char* wiring;
+    int position;
+    int notch;
+} Rotor;
 
 // Função para cálculo modular rápido (potência modular)
 // +para nao causar overflows
@@ -49,6 +62,55 @@ void cifra_cesar(char *msg, int chave) {
     }
 }
 
+// Enigma processa uma letra através dos rotores e do refletor
+void rotate_rotor(Rotor* rotor) {
+    rotor->position = (rotor->position + 1) % 26;
+}
+
+char enigma_process(Rotor rotors[], int num_rotors, char c) {
+    if (c < 'A' || c > 'Z') return c;
+    int index = c - 'A';
+
+    // Forward through rotors
+    for (int i = 0; i < num_rotors; i++) {
+        index = (rotors[i].wiring[(index + rotors[i].position) % 26] - 'A' - rotors[i].position + 26) % 26;
+    }
+    // Reflector
+    index = (REFLECTOR_B[index] - 'A');
+
+    // Backward through rotors
+    for (int i = num_rotors - 1; i >= 0; i--) {
+        for (int j = 0; j < 26; j++) {
+            if (rotors[i].wiring[j] == 'A' + (index + rotors[i].position) % 26) {
+                index = (j - rotors[i].position + 26) % 26;
+                break;
+            }
+        }
+    }
+
+    // Rotação dos rotores (simples)
+    rotate_rotor(&rotors[0]);
+    if (rotors[0].position == rotors[0].notch) {
+        rotate_rotor(&rotors[1]);
+        if (rotors[1].position == rotors[1].notch) {
+            rotate_rotor(&rotors[2]);
+        }
+    }
+
+    return 'A' + index;
+}
+
+void enigma_encrypt(char* msg, Rotor rotors[], int num_rotors) {
+    for (int i = 0; msg[i] != '\0'; i++) {
+        if (isalpha((unsigned char)msg[i])) {
+            char upper = toupper((unsigned char)msg[i]);
+            char enc = enigma_process(rotors, num_rotors, upper);
+            msg[i] = islower((unsigned char)msg[i]) ? tolower(enc) : enc;
+        }
+    }
+}
+
+// Cifra de substituição
 void decifra_substituicao(char *texto, const char *sub_key) {
     for (int i = 0; texto[i] != '\0'; i++) {
         char c = texto[i];
@@ -120,7 +182,6 @@ void *manager_server() {
 
 // Função para processar a conexão TCP com Diffie-Hellman
 void process_tcp_connection(int client_fd) {
-    printf("Cheguei 1!\n");
     char buffer[512];
     struct sockaddr_in udpAddr;
     int udpSock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -136,9 +197,7 @@ void process_tcp_connection(int client_fd) {
     unsigned long long public_key = mod_pow(DH_G, private_key, DH_P); // Chave pública do servidor
 
     // Receber chave pública do cliente
-    printf("Cheguei 2!\n");
     int len = read(client_fd, buffer, sizeof(buffer) - 1);
-    printf("Cheguei 3!\n");
     /* if (len <= 0) {
         close(client_fd);
         close(udpSock);
@@ -204,10 +263,16 @@ void process_tcp_connection(int client_fd) {
             cifra_cesar(mensagem, -cesar_key);
             printf("[VPNserver] Mensagem desencriptada: %s\n", mensagem);
         } else if (modo == 3) {
-            // Modo 3: Enigma (placeholder)
-            printf("[VPNserver] Modo 3: Enigma (não implementado)\n");
+            printf("[VPNserver] Modo 3: Enigma\n");
+            Rotor rotors[3] = {
+                {ROTOR_I, shared_key % 26, 16},
+                {ROTOR_II, (shared_key/26) % 26, 4},
+                {ROTOR_III, (shared_key/676) % 26, 21}
+            };
+            enigma_encrypt(mensagem, rotors, 3);
+            printf("[VPNserver] Mensagem desencriptada: %s\n", mensagem);
         } else if (modo == 4) {
-            printf("[VPNserver] Modo 4: Substituição (não implementado)\n");
+            printf("[VPNserver] Modo 4: Substituição\n");
             decifra_substituicao(mensagem, sub_key);
             printf("[VPNserver] Mensagem desencriptada: %s\n", mensagem);
         } else {
@@ -235,14 +300,10 @@ int main() {
     pthread_t mthread;
     pthread_create(&mthread, NULL, manager_server, NULL);
 
-    printf("main 1\n");
-
     // Criação do socket TCP
     int tcpSock = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in addr, clientAddr;
     socklen_t len = sizeof(clientAddr);
-
-    printf("main 2\n");
 
     // Configuração do endereço do servidor TCP
     addr.sin_family = AF_INET;
@@ -251,15 +312,12 @@ int main() {
     bind(tcpSock, (struct sockaddr*)&addr, sizeof(addr));
     listen(tcpSock, 5);
 
-    printf("main 3\n");
-
     // Loop para aceitar conexões de clientes TCP
     while (1) {
         int client_fd = accept(tcpSock, (struct sockaddr*)&clientAddr, &len);
        pid_t pid = fork();
         if (pid == 0) {
             // Processo filho para lidar com a conexão TCP
-            printf("main 4\n");
             process_tcp_connection(client_fd);
             exit(0);
         } else if (pid < 0) {

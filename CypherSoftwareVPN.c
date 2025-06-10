@@ -24,6 +24,18 @@
 #define ALPHABET "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 #define ALPHABET_SIZE 26
 
+// Enigma
+const char* ROTOR_I = "EKMFLGDQVZNTOWYHXUSPAIBRCJ";
+const char* ROTOR_II = "AJDKSIRUXBLHWTMCQGZNPYFVOE";
+const char* ROTOR_III = "BDFHJLCPRTXVZNYEIWGAKMUSQO";
+const char* REFLECTOR_B = "YRUHQSLDPXNGOKMIEBFZCWVJAT";
+
+typedef struct {
+    const char* wiring;
+    int position;
+    int notch;
+} Rotor;
+
 // Função para cálculo modular rápido (potência modular) -> Diffie-Hellman
 unsigned long long mod_pow(unsigned long long base, unsigned long long exp, unsigned long long mod) {
     unsigned long long result = 1;
@@ -50,6 +62,55 @@ void cifra_cesar(char *msg, int chave) {
     }
 }
 
+// Enigma processa uma letra através dos rotores e do refletor
+void rotate_rotor(Rotor* rotor) {
+    rotor->position = (rotor->position + 1) % 26;
+}
+
+char enigma_process(Rotor rotors[], int num_rotors, char c) {
+    if (c < 'A' || c > 'Z') return c;
+    int index = c - 'A';
+
+    // Forward through rotors
+    for (int i = 0; i < num_rotors; i++) {
+        index = (rotors[i].wiring[(index + rotors[i].position) % 26] - 'A' - rotors[i].position + 26) % 26;
+    }
+    // Reflector
+    index = (REFLECTOR_B[index] - 'A');
+
+    // Backward through rotors
+    for (int i = num_rotors - 1; i >= 0; i--) {
+        for (int j = 0; j < 26; j++) {
+            if (rotors[i].wiring[j] == 'A' + (index + rotors[i].position) % 26) {
+                index = (j - rotors[i].position + 26) % 26;
+                break;
+            }
+        }
+    }
+
+    // Rotação dos rotores (simples)
+    rotate_rotor(&rotors[0]);
+    if (rotors[0].position == rotors[0].notch) {
+        rotate_rotor(&rotors[1]);
+        if (rotors[1].position == rotors[1].notch) {
+            rotate_rotor(&rotors[2]);
+        }
+    }
+
+    return 'A' + index;
+}
+
+void enigma_encrypt(char* msg, Rotor rotors[], int num_rotors) {
+    for (int i = 0; msg[i] != '\0'; i++) {
+        if (isalpha((unsigned char)msg[i])) {
+            char upper = toupper((unsigned char)msg[i]);
+            char enc = enigma_process(rotors, num_rotors, upper);
+            msg[i] = islower((unsigned char)msg[i]) ? tolower(enc) : enc;
+        }
+    }
+}
+
+// Função para gerar uma chave de substituição aleatória
 void gerar_sub_key(char *sub_key) {
     strcpy(sub_key, ALPHABET);
 
@@ -64,6 +125,7 @@ void gerar_sub_key(char *sub_key) {
     sub_key[ALPHABET_SIZE] = '\0'; // Garante terminação
 }
 
+// Função para encriptar com a cifra de substituição
 void cifra_substituicao(char *texto, const char *sub_key) {
     for (int i = 0; texto[i] != '\0'; i++) {
         char c = texto[i];
@@ -129,7 +191,7 @@ const char *menu_admin =
     "║  4) Versão Software          ║\n"
     "║  5) Sair                     ║\n"
     "╚══════════════════════════════╝\n"
-    "\nEscolha uma opcao: ";
+    "\nEscolha uma opção: ";
 
 const char *menu_criptografia = 
     "╔══════════════════════════════╗\n"
@@ -137,17 +199,17 @@ const char *menu_criptografia =
     "╠══════════════════════════════╣\n"
     "║ 1) Sem Encriptação           ║\n"
     "║ 2) Cifra de César            ║\n"
-    "║ 3) Enigma (em breve)         ║\n"
-    "║ 4) Substituicao (em breve)   ║\n"
+    "║ 3) Enigma                    ║\n"
+    "║ 4) Substituição              ║\n"
     "║ 5) Voltar ao menu principal  ║\n"
     "╚══════════════════════════════╝\n"
-    "\nEscolha uma opcao: ";
+    "\nEscolha uma opção: ";
 
 const char *menu_versao =
     "╔══════════════════════════════════╗\n"
     "║          Versão Software         ║\n"
     "╠══════════════════════════════════╣\n"
-    "║ Versão: 2.2                      ║\n"
+    "║ Versão: 2.3                      ║\n"
     "║ Desenvolvido por: Cyphersoftware ║\n"
     "╚══════════════════════════════════╝\n";
 
@@ -218,7 +280,6 @@ int main() {
         recvfrom(udpSock, buffer, SIZE, 0, (struct sockaddr*)&udpAddr, &addr_len);
 
         if (strncmp(buffer, "MENU:criptografia", 10) == 0) {
-            //responder_menu_guest(sock, &client_addr, addr_len);
             sendto(udpSock, menu_criptografia, strlen(menu_criptografia), 0, (struct sockaddr*)&udpAddr, addr_len);
         } else if (strncmp(buffer, "MENU:admin", 10) == 0) {
             sendto(udpSock, menu_admin, strlen(menu_admin), 0, (struct sockaddr*)&udpAddr, addr_len);
@@ -262,12 +323,20 @@ int main() {
                         cifra_cesar(payload, cesar_key);
                     }
                 } else if (modo == 3) {
-                    // Modo 3: Enigma (placeholder)
-                    printf("[CyperSoftwareVPN] Modo 3: Enigma (não implementado)\n");
+                    printf("[CyperSoftwareVPN] Modo 3: Enigma\n");
+                    Rotor rotors[3] = {
+                        {ROTOR_I, shared_key % 26, 16},
+                        {ROTOR_II, (shared_key/26) % 26, 4},
+                        {ROTOR_III, (shared_key/676) % 26, 21}
+                    };
+                    char *payload = strrchr(conteudo, ':');
+                    if (payload && *(payload + 1) != '\0') {
+                        payload++;
+                        enigma_encrypt(payload, rotors, 3);
+                    }
                 } else if (modo == 4) {
-                    // Modo 4: Substituição (placeholder)
                     cifra_substituicao(payload, sub_key);
-                    printf("[CyperSoftwareVPN] Modo 4: Substituição (não implementado)\n");
+                    printf("[CyperSoftwareVPN] Modo 4: Substituição\n");
                 } else {
                     printf("[CyperSoftwareVPN] Modo desconhecido\n");
                 }
