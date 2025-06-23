@@ -4,7 +4,7 @@ echo "A Compilar VPNserver.c..."
 gcc -o VPNserver VPNserver.c || { echo "Erro ao compilar VPNserver.c"; exit 1; }
 
 echo "A Compilar CypherSoftwareVPN.c..."
-gcc -o CypherSoftwareVPN CypherSoftwareVPN.c || { echo "Erro ao compilar CypherSoftwareVPN.c"; exit 1; }
+gcc -o CypherSoftwareVPN CypherSoftwareVPN.c -lssl -lcrypto || { echo "Erro ao compilar CypherSoftwareVPN.c"; exit 1; }
 
 echo "A Compilar ProgUDP2.c..."
 gcc -o ProgUDP2 ProgUDP2.c || { echo "Erro ao compilar ProgUDP2.c"; exit 1; }
