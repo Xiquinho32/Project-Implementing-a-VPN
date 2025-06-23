@@ -13,10 +13,10 @@
 
 To ensure correct communication between components, follow this execution order:
 
-1. **TCPserver**
-2. **TCPclient**
+1. **VPNserver**
+2. **CypherSoftwareVPN**
 3. **ProgUDP2**
-4. **CypherSoftwareVPN**
+4. **ProgUDP1**
 
 ---
 
@@ -39,7 +39,7 @@ gcc -o VPNserver VPNserver.c
 ```
 CyperSoftwareVPN:  
 ```bash 
-gcc -o CypherSoftwareVPN CypherSoftwareVPN.c
+gcc -o CypherSoftwareVPN CypherSoftwareVPN.c -lssl -lcrypto
 ./CypherSoftwareVPN
 ```
 UDP Program 2:
@@ -91,14 +91,14 @@ Create the alias:
 ```bash
 nano ~/.bashrc
 ```
+Update the configurations:
+```bash
+source ~/.bashrc
+```
 Add the following line to the end of the script:
 Note: change the path of the file
 ```bash
 alias compilarvpn='~/meus_scripts/compilar.sh'
-```
-Update the configurations:
-```bash
-source ~/.bashrc
 ```
 Then you just need to type the alias:
 ```bash

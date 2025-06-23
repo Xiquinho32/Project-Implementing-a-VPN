@@ -1,4 +1,4 @@
-// CyperSoftwareVPN.c
+// CypherSoftwareVPN.c
 // Includes das bibliotecas
 #include <stdio.h>     // Input/Output padrão
 #include <stdlib.h>    // Funções gerais
@@ -7,6 +7,7 @@
 #include <arpa/inet.h> // Funções de rede para sockets
 #include <pthread.h>   // Funções de threads
 #include <time.h>      // Para srand e time()
+#include <openssl/sha.h>
 #include <ctype.h>
 
 // Definições de constantes
@@ -35,6 +36,83 @@ typedef struct {
     int position;
     int notch;
 } Rotor;
+
+
+// ======================== S T A R T   O F   B L O C K C H A I N ========================
+
+
+// Criação da estrutura do bloco para a blockchain
+typedef struct Block {
+    int index; // indica o número do bloco
+    char timestamp[64]; // data e hora de criação do bloco
+    char data[256]; // dados do bloco (descrição)
+    char previous_hash[65]; // hash do bloco anterior
+    char hash[65]; // hash do bloco atual
+} Block;
+
+// Função para obter o timestamp atual para a blockchain
+void get_timestamp(char *buffer, size_t size) {
+    time_t now = time(NULL); // Obtém o tempo atual
+    strftime(buffer, size, "%Y-%m-%d %H:%M:%S", localtime(&now)); // Formata o tempo atual (Ano-Mês-Dia Hora:Minuto:Segundo)
+}
+
+// Função para calcular o hash SHA256 de um bloco
+void calculate_hash(Block *block, char output[65]) {
+    char input[1024];
+    snprintf(input, sizeof(input), "%d%s%s%s", block->index, block->timestamp, block->data, block->previous_hash); // Concatena os campos do bloco
+
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)input, strlen(input), hash); // Calcula o hash SHA256
+
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) { //Ciclo FOR para converter o hash em string hexadecimal
+        sprintf(output + (i * 2), "%02x", hash[i]);
+    }
+    output[64] = '\0'; // Garante que a string está terminada
+}
+
+// Função para criar um novo bloco
+Block create_block(int index, const char *data, const char *prev_hash) {
+    Block new_block;
+    new_block.index = index; // Define o índice do bloco
+    strncpy(new_block.data, data, sizeof(new_block.data) - 1); // Copia os dados do bloco
+    get_timestamp(new_block.timestamp, sizeof(new_block.timestamp)); // Obtém o timestamp atual
+    strncpy(new_block.previous_hash, prev_hash, sizeof(new_block.previous_hash) - 1); // Copia o hash do bloco anterior
+    calculate_hash(&new_block, new_block.hash); // Calcula o hash do novo bloco
+    return new_block;
+}
+
+// Blockchain global variables
+#define MAX_BLOCKS 10 // Número máximo de blocos na blockchain
+Block blockchain[MAX_BLOCKS]; // Array para armazenar os blocos
+int blockchain_size = 0; // Tamanho atual da blockchain
+
+// Função para adicionar um novo bloco à blockchain
+void adicionar_config_block(const char *descricao) {
+    char prev_hash[65] = "0";
+    if (blockchain_size > 0) // Se já houver blocos, usa o hash do último bloco como o hash anterior
+        strncpy(prev_hash, blockchain[blockchain_size - 1].hash, 65);
+
+    Block b = create_block(blockchain_size, descricao, prev_hash); // Cria um novo bloco com o índice atual, descrição e hash do bloco anterior
+    blockchain[blockchain_size++] = b; // Adiciona o novo bloco ao array da blockchain
+
+    // Guarda o bloco no ficheiro de log apenas se o indice for menor que o máximo permitido (MAX_BLOCKS)
+    if (b.index < MAX_BLOCKS) {   
+        FILE *f = fopen("blockchain_log.txt", "a");
+        if (f) {
+            if (b.index == 0) {
+                fprintf(f, "======================== N E W   B L O C K C H A I N ========================\n");
+            }
+            fprintf(f, "Bloco %d:\nData: %s\nHash: %s\nPrev: %s\nConteúdo: %s\n\n",
+                b.index, b.timestamp, b.hash, b.previous_hash, b.data);
+            fclose(f);
+        }
+    }
+    
+}
+
+
+// ======================== E N D   O F   B L O C K C H A I N ========================
+
 
 // Função para cálculo modular rápido (potência modular) -> Diffie-Hellman
 unsigned long long mod_pow(unsigned long long base, unsigned long long exp, unsigned long long mod) {
@@ -318,6 +396,7 @@ int main() {
                 if (modo == 1) {
                     // Modo 1: Sem encriptação
                     printf("[CyperSoftwareVPN] Modo 1: Mensagem não encriptada\n");
+                    adicionar_config_block("Utilizador escolheu sem encriptação");
                 } else if (modo == 2) {
                     // Modo 2: Cifra de César
                     printf("[CyperSoftwareVPN] Modo 2: Cifra de César\n");
@@ -326,6 +405,7 @@ int main() {
                         payload++; // início do texto a encriptar
                         cifra_cesar(payload, cesar_key);
                     }
+                    adicionar_config_block("Utilizador escolheu Cifra de César");
                 } else if (modo == 3) {
                     printf("[CyperSoftwareVPN] Modo 3: Enigma\n");
                     Rotor rotors[3] = {
@@ -338,9 +418,11 @@ int main() {
                         payload++;
                         enigma_encrypt(payload, rotors, 3);
                     }
+                    adicionar_config_block("Utilizador escolheu Enigma");
                 } else if (modo == 4) {
                     cifra_substituicao(payload, sub_key);
                     printf("[CyperSoftwareVPN] Modo 4: Substituição\n");
+                    adicionar_config_block("Utilizador escolheu Substituição");
                 } else {
                     printf("[CyperSoftwareVPN] Modo desconhecido\n");
                 }
